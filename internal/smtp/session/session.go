@@ -23,10 +23,10 @@ type Session struct {
 	reader  *bufio.Reader
 }
 
-func New(host string, port int, tlsconf *tls.Config) *Session {
+func New(addr string, tlsconf *tls.Config) *Session {
 	return &Session{
 		network: "tcp",
-		addr:    fmt.Sprintf("%s:%d", host, port),
+		addr:    addr,
 		tlsconf: tlsconf,
 	}
 }
@@ -120,6 +120,32 @@ func (s *Session) Exchange(cmd command.Command) error {
 			return nil
 		}
 	}
+}
+
+func (s *Session) Pipeline(cmds []command.Command) error {
+	for _, cmd := range cmds {
+		input := cmd.Write()
+		err := s.writeln(input)
+		if err != nil {
+			return err
+		}
+		fmt.Print(string(input))
+	}
+
+	for _, cmd := range cmds {
+		output, err := s.readln()
+		if err != nil {
+			return err
+		}
+
+		fmt.Print("> ", string(output))
+		_, err = cmd.OnReply(output)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Session) readln() ([]byte, error) {
